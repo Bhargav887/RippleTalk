@@ -12,10 +12,10 @@ const communitySchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    members: [
+    posts: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
+        ref: "Post",
       },
     ],
   },

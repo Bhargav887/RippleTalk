@@ -20,6 +20,12 @@ const userSchema = new mongoose.Schema(
       required: true,
       minlength: 6,
     },
+    posts: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Post",
+      },
+    ],
   },
   { timestamps: true }
 );

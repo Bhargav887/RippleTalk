@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const postSchema = new mongoose.Schema(
   {
-    author: {
+    user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
@@ -12,14 +12,16 @@ const postSchema = new mongoose.Schema(
       ref: "Community",
       required: true,
     },
-    title: {
+    mood: {
       type: String,
+      enum: ["high", "low"],
       required: true,
-      trim: true,
     },
     content: {
       type: String,
       required: true,
+      maxlength: 278,
+      trim: true,
     },
   },
   { timestamps: true }
