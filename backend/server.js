@@ -3,11 +3,11 @@ const mongoose = require("mongoose");
 const morgan = require("morgan");
 const cors = require("cors");
 
-const config = require("./config"); // Import config for PORT and MONGO_URL
+const config = require("./src/config"); // Import config for PORT and MONGO_URL
 
-const User = require("./models/User");
-const Post = require("./models/Post");
-const Community = require("./models/Community");
+const User = require("./src/models/User");
+const Post = require("./src/models/Post");
+const Community = require("./src/models/Community");
 
 const app = express();
 
