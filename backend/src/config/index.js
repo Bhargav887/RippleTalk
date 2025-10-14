@@ -7,5 +7,7 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 // Export config variables
 module.exports = {
   port: process.env.PORT || 8080,
-  mongoURL: process.env.MONGO_URL || "mongodb://127.0.0.1:27017/rippletalk",
+  mongoURL:
+    process.env.MONGO_URL ||
+    "mongodb+srv://bhargav:bhargav16@cluster0.bomsagc.mongodb.net/rippletalk;",
 };
