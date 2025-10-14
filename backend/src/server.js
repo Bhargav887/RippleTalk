@@ -1,22 +1,24 @@
-require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const morgan = require("morgan");
 const cors = require("cors");
+
+const config = require("./config"); // Import config for PORT and MONGO_URL
 
 const User = require("./models/User");
 const Post = require("./models/Post");
 const Community = require("./models/Community");
 
 const app = express();
-const PORT = process.env.PORT || 8080;
-const MONGO_URL =
-  process.env.MONGO_URL || "mongodb://127.0.0.1:27017/rippletalk";
 
 app.use(express.json());
 app.use(cors());
 app.use(morgan("dev"));
 
+const PORT = config.port;
+const MONGO_URL = config.mongoURL;
+
+// Connect to MongoDB
 mongoose
   .connect(MONGO_URL)
   .then(() => console.log("MongoDB connected"))
@@ -25,10 +27,12 @@ mongoose
     process.exit(1);
   });
 
+// Root route
 app.get("/", (req, res) => {
   res.json({ message: "Welcome to RippleTalk API 🌊" });
 });
 
+// Create a post
 app.post("/posts/:communityId/:userId", async (req, res, next) => {
   try {
     const { communityId, userId } = req.params;
@@ -41,6 +45,7 @@ app.post("/posts/:communityId/:userId", async (req, res, next) => {
       Community.findById(communityId),
       User.findById(userId),
     ]);
+
     if (!community)
       return res.status(404).json({ error: "Community not found." });
     if (!user) return res.status(404).json({ error: "User not found." });
@@ -51,6 +56,7 @@ app.post("/posts/:communityId/:userId", async (req, res, next) => {
       mood,
       content,
     });
+
     await Promise.all([
       community.updateOne({ $push: { posts: post._id } }),
       user.updateOne({ $push: { posts: post._id } }),
@@ -62,6 +68,7 @@ app.post("/posts/:communityId/:userId", async (req, res, next) => {
   }
 });
 
+// Delete a post
 app.delete("/posts/:communityId/:userId/:postId", async (req, res, next) => {
   try {
     const { communityId, userId, postId } = req.params;
@@ -80,6 +87,7 @@ app.delete("/posts/:communityId/:userId/:postId", async (req, res, next) => {
   }
 });
 
+// Get posts of a community
 app.get("/community/:communityId/posts", async (req, res, next) => {
   try {
     const { communityId } = req.params;
@@ -87,8 +95,10 @@ app.get("/community/:communityId/posts", async (req, res, next) => {
       path: "posts",
       populate: { path: "user", select: "username email" },
     });
+
     if (!community)
       return res.status(404).json({ error: "Community not found." });
+
     res.json({
       message: "Posts fetched successfully.",
       total: community.posts.length,
@@ -99,6 +109,7 @@ app.get("/community/:communityId/posts", async (req, res, next) => {
   }
 });
 
+// Error handling middleware
 app.use((err, req, res, next) => {
   console.error("Server Error:", err.message);
   res
@@ -106,6 +117,7 @@ app.use((err, req, res, next) => {
     .json({ error: "Internal Server Error", message: err.message });
 });
 
+// Start server
 app.listen(PORT, () =>
   console.log(`Server running at http://localhost:${PORT}`)
 );
