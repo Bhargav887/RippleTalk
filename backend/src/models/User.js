@@ -1,33 +1,48 @@
 const mongoose = require("mongoose");
+const { Schema } = mongoose;
 
-const userSchema = new mongoose.Schema(
+const userSchema = new Schema(
   {
     username: {
       type: String,
       required: true,
-      unique: true,
-      trim: true,
       minlength: 3,
     },
     email: {
       type: String,
-      required: true,
-      unique: true,
       lowercase: true,
+      required: true,
     },
     password: {
       type: String,
       required: true,
-      minlength: 6,
     },
     posts: [
       {
-        type: mongoose.Schema.Types.ObjectId,
+        type: Schema.Types.ObjectId,
         ref: "Post",
       },
     ],
+    points: {
+      type: String,
+      default: 0,
+    },
+    streak: {
+      type: String,
+      default: 0,
+    },
+    entries: {
+      type: String,
+      default: 0,
+    },
+    today: {
+      type: String,
+      default: 0,
+    },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
 module.exports = mongoose.model("User", userSchema);

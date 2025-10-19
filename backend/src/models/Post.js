@@ -1,15 +1,11 @@
 const mongoose = require("mongoose");
+const { Schema } = mongoose;
 
-const postSchema = new mongoose.Schema(
+const postSchema = new Schema(
   {
     user: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "User",
-      required: true,
-    },
-    community: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Community",
       required: true,
     },
     mood: {
@@ -19,12 +15,14 @@ const postSchema = new mongoose.Schema(
     },
     content: {
       type: String,
+      maxlength: 287,
       required: true,
-      maxlength: 278,
       trim: true,
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
 module.exports = mongoose.model("Post", postSchema);
