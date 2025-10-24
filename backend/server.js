@@ -5,6 +5,8 @@ const User = require("./models/user");
 const Post = require("./models/post");
 const Ripple = require("./models/ripple");
 const dotenv = require("dotenv");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 
 app.use(express.json());
 
@@ -26,28 +28,111 @@ const start = async () => {
 };
 start();
 
+//  verify token middelware
+function verifyToken(req, res, next) {
+  const token = req.headers["authorization"]?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Access denied" });
+
+  try {
+    const verified = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = verified;
+    next();
+  } catch (err) {
+    res.status(403).json({ message: "Invalid token" });
+  }
+}
+
 // user routes
-// get user
-app.get("/users/:id", async (req, res) => {
-  let { id } = req.params;
-  const user = await User.findById(id);
-  res.json(user);
+
+//  register new user
+app.post("/register", async (req, res) => {
+  try {
+    let { username, email, password } = req.body;
+
+    let existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: "User already exists" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const newUser = new User({ username, email, password: hashedPassword });
+    await newUser.save();
+
+    res.status(201).json({
+      message: "User registered successfully!",
+      user: {
+        id: newUser._id,
+        username: newUser.username,
+        email: newUser.email,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
-//  new user
-app.post("/users", async (req, res) => {
-  let { username, email, password } = req.body;
+//  user login
+app.post("/login", async (req, res) => {
+  try {
+    let { email, password } = req.body;
 
-  const newUser = new User({ username, email, password });
-  await newUser.save();
+    // find user
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ message: "Invalid email " });
+    }
+
+    // compare password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Invalid password " });
+    }
+
+    // generate token
+    const token = jwt.sign(
+      {
+        id: user._id,
+        username: user.username,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+    res.json({
+      message: "Login successful",
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// get profile
+app.get("/profile", verifyToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("-password"); // hide password
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
 // post routes
 // user all post
-app.get("/users/:id/posts", async (req, res) => {
-  let { id } = req.params;
-  const allPost = await Post.find({ user: id });
-  res.json(allPost);
+app.get("/my-posts", verifyToken, async (req, res) => {
+  try {
+    const posts = await Post.find({ user: req.user.id }).sort({
+      createdAt: -1,
+    });
+    res.json(posts);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
 //get post
@@ -58,20 +143,53 @@ app.get("/posts/:id", async (req, res) => {
 });
 
 // new post
-app.post("/posts", async (req, res) => {
-  let { mood, content } = req.body; // here, you need to add current user id
-  const newPost = new Post({ mood, content });
-  await newPost.save();
+app.post("/posts", verifyToken, async (req, res) => {
+  try {
+    let { mood, content } = req.body; // here, you need to add current user id
+    if (!mood || !content) {
+      return res.status(400).json({ message: "Mood and content are required" });
+    }
+
+    const newPost = new Post({
+      user: req.user.id,
+      mood,
+      content,
+    });
+    await newPost.save();
+    // Add to user's post list
+    await User.findByIdAndUpdate(req.user.id, {
+      $push: { posts: newPost._id },
+    });
+
+    res.status(201).json({
+      message: "Post created successfully",
+      post: newPost,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
 // delete post
-app.delete("/posts/:id", async (req, res) => {
-  let { id } = req.params;
-  const post = await Post.findByIdAndDelete(id);
-  await User.updateMany({ posts: id }, { $pull: { posts: id } });
-  await Ripple.updateMany({ posts: id }, { $pull: { posts: id } });
+app.delete("/posts/:id", verifyToken, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) return res.status(404).json({ message: "Post not found" });
 
-  res.json({ message: "post deleted successfully" });
+    // Only allow owner to delete
+    if (post.user.toString() !== req.user.id) {
+      return res
+        .status(403)
+        .json({ message: "You can only delete your own posts" });
+    }
+
+    await Post.findByIdAndDelete(req.params.id);
+    await User.findByIdAndUpdate(req.user.id, { $pull: { posts: post._id } });
+
+    res.json({ message: "Post deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
 // ripple routes
