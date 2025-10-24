@@ -1,9 +1,9 @@
 const express = require("express");
 const app = express();
 const mongoose = require("mongoose");
-const User = require("./src/models/user");
-const Post = require("./src/models/post");
-const Ripple = require("./src/models/ripple");
+const User = require("./models/user");
+const Post = require("./models/post");
+const Ripple = require("./models/ripple");
 const dotenv = require("dotenv");
 
 app.use(express.json());
