@@ -1,62 +1,87 @@
+require("dotenv").config();
 const express = require("express");
-const app = express();
 const mongoose = require("mongoose");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const cors = require("cors");
+
 const User = require("./models/user");
 const Post = require("./models/post");
 const Ripple = require("./models/ripple");
-const dotenv = require("dotenv");
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
 
+const app = express();
 app.use(express.json());
 
-require("dotenv").config();
-const PORT = process.env.PORT;
+// ✅ CORS: allow your frontend and local dev
+app.use(
+  cors({
+    origin: ["http://localhost:5173", "https://your-frontend-domain.com"],
+    credentials: true,
+  })
+);
 
+// ✅ Start server
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`server is listening port: ${PORT}`);
-  // console.log(process.env.ATLAS_URL);
+  console.log(`✅ Server running on port ${PORT}`);
 });
 
+// ✅ Database connection
 const start = async () => {
   try {
-    await mongoose.connect(process.env.ATLAS_URL);
-    console.log("Successfully Database is connected!");
+    await mongoose.connect(process.env.ATLAS_URL, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    console.log("✅ Database connected!");
   } catch (err) {
-    console.error("Database connection failed !", err.message);
+    console.error("❌ Database connection failed:", err.message);
+    process.exit(1);
   }
 };
 start();
 
-//  verify token middelware
+// ✅ Verify token middleware
 function verifyToken(req, res, next) {
-  const token = req.headers["authorization"]?.split(" ")[1];
-  if (!token) return res.status(401).json({ message: "Access denied" });
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res
+      .status(401)
+      .json({ message: "Access denied. No token provided." });
+  }
 
+  const token = authHeader.split(" ")[1];
   try {
-    const verified = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = verified;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
     next();
   } catch (err) {
-    res.status(403).json({ message: "Invalid token" });
+    res.status(403).json({ message: "Invalid or expired token" });
   }
 }
 
-// user routes
+/* ---------------------- AUTH ROUTES ---------------------- */
 
-//  register new user
+// ✅ Register
 app.post("/register", async (req, res) => {
   try {
-    let { username, email, password } = req.body;
+    const { username, email, password } = req.body;
 
-    let existingUser = await User.findOne({ email });
-    if (existingUser) {
+    if (!username || !email || !password)
+      return res.status(400).json({ message: "All fields are required" });
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser)
       return res.status(400).json({ message: "User already exists" });
-    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const newUser = new User({ username, email, password: hashedPassword });
+    const newUser = new User({
+      username,
+      email,
+      password: hashedPassword,
+    });
+
     await newUser.save();
 
     res.status(201).json({
@@ -72,32 +97,26 @@ app.post("/register", async (req, res) => {
   }
 });
 
-//  user login
+// ✅ Login
 app.post("/login", async (req, res) => {
   try {
-    let { email, password } = req.body;
+    const { email, password } = req.body;
 
-    // find user
+    if (!email || !password)
+      return res.status(400).json({ message: "Email and password required" });
+
     const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({ message: "Invalid email " });
-    }
+    if (!user) return res.status(400).json({ message: "Invalid email" });
 
-    // compare password
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: "Invalid password " });
-    }
+    if (!isMatch) return res.status(400).json({ message: "Invalid password" });
 
-    // generate token
     const token = jwt.sign(
-      {
-        id: user._id,
-        username: user.username,
-      },
+      { id: user._id, username: user.username },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
+
     res.json({
       message: "Login successful",
       token,
@@ -112,18 +131,20 @@ app.post("/login", async (req, res) => {
   }
 });
 
-// get profile
+// ✅ Profile
 app.get("/profile", verifyToken, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select("-password"); // hide password
+    const user = await User.findById(req.user.id).select("-password");
+    if (!user) return res.status(404).json({ message: "User not found" });
     res.json(user);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// post routes
-// user all post
+/* ---------------------- POST ROUTES ---------------------- */
+
+// ✅ Get all posts of current user
 app.get("/my-posts", verifyToken, async (req, res) => {
   try {
     const posts = await Post.find({ user: req.user.id }).sort({
@@ -135,28 +156,33 @@ app.get("/my-posts", verifyToken, async (req, res) => {
   }
 });
 
-//get post
+// ✅ Get single post
 app.get("/posts/:id", async (req, res) => {
-  let { id } = req.params;
-  const post = await Post.findById(id);
-  res.json(post);
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) return res.status(404).json({ message: "Post not found" });
+    res.json(post);
+  } catch (err) {
+    res.status(400).json({ message: "Invalid post ID" });
+  }
 });
 
-// new post
+// ✅ Create post
 app.post("/posts", verifyToken, async (req, res) => {
   try {
-    let { mood, content } = req.body; // here, you need to add current user id
-    if (!mood || !content) {
+    const { mood, content } = req.body;
+    if (!mood || !content)
       return res.status(400).json({ message: "Mood and content are required" });
-    }
 
     const newPost = new Post({
       user: req.user.id,
       mood,
       content,
     });
+
     await newPost.save();
-    // Add to user's post list
+
+    // add post to user's list
     await User.findByIdAndUpdate(req.user.id, {
       $push: { posts: newPost._id },
     });
@@ -170,18 +196,16 @@ app.post("/posts", verifyToken, async (req, res) => {
   }
 });
 
-// delete post
+// ✅ Delete post
 app.delete("/posts/:id", verifyToken, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    // Only allow owner to delete
-    if (post.user.toString() !== req.user.id) {
+    if (post.user.toString() !== req.user.id)
       return res
         .status(403)
         .json({ message: "You can only delete your own posts" });
-    }
 
     await Post.findByIdAndDelete(req.params.id);
     await User.findByIdAndUpdate(req.user.id, { $pull: { posts: post._id } });
@@ -192,10 +216,14 @@ app.delete("/posts/:id", verifyToken, async (req, res) => {
   }
 });
 
-// ripple routes
+/* ---------------------- RIPPLE ROUTES ---------------------- */
 
-// get all posts
+// ✅ Get all ripples (or posts if you prefer)
 app.get("/ripple", async (req, res) => {
-  const ripple = await Post.find({});
-  res.json(ripple);
+  try {
+    const ripples = await Ripple.find({});
+    res.json(ripples);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
