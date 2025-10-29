@@ -12,11 +12,12 @@ const Ripple = require("./models/ripple");
 const app = express();
 app.use(express.json());
 
-// ✅ CORS: allow your frontend and local dev
+// ✅ CORS (open for all origins)
 app.use(
   cors({
-    origin: ["http://localhost:5173", "https://your-frontend-domain.com"],
-    credentials: true,
+    origin: "*", // allow all origins
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
@@ -41,7 +42,7 @@ const start = async () => {
 };
 start();
 
-// ✅ Verify token middleware
+// ✅ JWT verification middleware
 function verifyToken(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -218,7 +219,7 @@ app.delete("/posts/:id", verifyToken, async (req, res) => {
 
 /* ---------------------- RIPPLE ROUTES ---------------------- */
 
-// ✅ Get all ripples (or posts if you prefer)
+// ✅ Get all ripples
 app.get("/ripple", async (req, res) => {
   try {
     const ripples = await Ripple.find({});
