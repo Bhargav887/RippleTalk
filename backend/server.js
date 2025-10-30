@@ -219,11 +219,13 @@ app.delete("/posts/:id", verifyToken, async (req, res) => {
 
 /* ---------------------- RIPPLE ROUTES ---------------------- */
 
-// ✅ Get all ripples
+// ✅ Get all posts (with user info populated)
 app.get("/ripple", async (req, res) => {
   try {
-    const ripples = await Ripple.find({});
-    res.json(ripples);
+    const posts = await Post.find({})
+      .populate("user", "username email") // include only username & email
+      .sort({ createdAt: -1 }); // newest first
+    res.json(posts);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
