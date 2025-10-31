@@ -1,8 +1,11 @@
+// tests/auth.test.js
 const request = require("supertest");
-let app;
+const User = require("../models/user");
+const app = require("../server");
 
-beforeAll(() => {
-  app = require("../server");
+beforeEach(async () => {
+  // ensure fresh DB state between tests
+  await User.deleteMany({});
 });
 
 describe("Auth Routes", () => {
@@ -34,6 +37,14 @@ describe("Auth Routes", () => {
     expect(res.body.message).toMatch(/already exists/i);
   });
 
+  it("should reject register with missing fields", async () => {
+    const res = await request(app).post("/register").send({
+      email: "no-username@example.com",
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.body.message).toMatch(/all fields/i);
+  });
+
   it("should login successfully", async () => {
     await request(app).post("/register").send({
       username: "Mark",
@@ -48,6 +59,7 @@ describe("Auth Routes", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.body).toHaveProperty("token");
+    expect(res.body.user.email).toBe("mark@example.com");
   });
 
   it("should reject login with invalid password", async () => {
@@ -63,5 +75,12 @@ describe("Auth Routes", () => {
     });
 
     expect(res.statusCode).toBe(400);
+    expect(res.body.message).toMatch(/invalid password/i);
+  });
+
+  it("should reject login with missing fields", async () => {
+    const res = await request(app).post("/login").send({});
+    expect(res.statusCode).toBe(400);
+    expect(res.body.message).toMatch(/required/i);
   });
 });

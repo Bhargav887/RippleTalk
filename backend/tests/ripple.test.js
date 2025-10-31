@@ -1,9 +1,6 @@
+// tests/ripple.test.js
 const request = require("supertest");
-let app;
-
-beforeAll(() => {
-  app = require("../server");
-});
+const app = require("../server");
 
 describe("Ripple Routes", () => {
   it("should return all posts (empty initially)", async () => {
