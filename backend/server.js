@@ -21,12 +21,13 @@ app.use(
   })
 );
 
+// JWT verification middleware
 function verifyToken(req, res, next) {
-  const authHeader = req.headers.authorization || "";
-  if (!authHeader.startsWith("Bearer ")) {
-    // ✅ Covers missing + malformed token
-    res.status(401).json({ message: "Access denied. No token provided." });
-    return;
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res
+      .status(401)
+      .json({ message: "Access denied. No token provided." });
   }
 
   const token = authHeader.split(" ")[1];
@@ -35,7 +36,6 @@ function verifyToken(req, res, next) {
     req.user = decoded;
     next();
   } catch (err) {
-    // ✅ ensures this block is covered
     res.status(403).json({ message: "Invalid or expired token" });
   }
 }
@@ -47,10 +47,8 @@ app.post("/register", async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
-    if (!username || !email || !password) {
-      res.status(400).json({ message: "All fields are required" });
-      return; // ✅ ensures test can mark this as covered
-    }
+    if (!username || !email || !password)
+      return res.status(400).json({ message: "All fields are required" });
 
     const existingUser = await User.findOne({ email });
     if (existingUser)
@@ -84,10 +82,8 @@ app.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
-      res.status(400).json({ message: "Email and password required" });
-      return; // ✅ explicit branch coverage
-    }
+    if (!email || !password)
+      return res.status(400).json({ message: "Email and password required" });
 
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ message: "Invalid email" });
@@ -306,20 +302,16 @@ const start = async () => {
       await mongoose.connect(process.env.ATLAS_URL);
       console.log("✅ Database connected!");
     } else {
-      // ✅ else branch covered
       console.log("ℹ️ Using existing mongoose connection");
     }
 
-    // ✅ add explicit branch for coverage simulation
-    if (process.env.NODE_ENV === "test-simulate") {
-      console.log("🧪 Simulated startup in test-simulate mode");
-      app.emit("startup:test"); // fake event for tests
-    } else if (process.env.NODE_ENV !== "test") {
+    // ✅ Only start listening outside of tests
+    if (process.env.NODE_ENV !== "test") {
       app.listen(process.env.PORT || 3000, () => {
         console.log(`Server running on port ${process.env.PORT || 3000}`);
       });
     } else {
-      console.log("ℹRunning in test mode — server.listen suppressed");
+      console.log("Running in test mode — server.listen suppressed");
     }
   } catch (err) {
     console.error("Database connection failed:", err.message);
