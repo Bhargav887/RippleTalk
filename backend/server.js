@@ -12,16 +12,37 @@ const Ripple = require("./models/ripple");
 const app = express();
 app.use(express.json());
 
-// CORS
+// ✅ CORS (open for all origins)
 app.use(
   cors({
-    origin: "*",
+    origin: "*", // allow all origins
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
-// JWT verification middleware
+// ✅ Start server
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
+});
+
+// ✅ Database connection
+const start = async () => {
+  try {
+    await mongoose.connect(process.env.ATLAS_URL, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    console.log("✅ Database connected!");
+  } catch (err) {
+    console.error("❌ Database connection failed:", err.message);
+    process.exit(1);
+  }
+};
+start();
+
+// ✅ JWT verification middleware
 function verifyToken(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -42,7 +63,7 @@ function verifyToken(req, res, next) {
 
 /* ---------------------- AUTH ROUTES ---------------------- */
 
-// Register
+// ✅ Register
 app.post("/register", async (req, res) => {
   try {
     const { username, email, password } = req.body;
@@ -77,7 +98,7 @@ app.post("/register", async (req, res) => {
   }
 });
 
-// Login
+// ✅ Login
 app.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -111,7 +132,7 @@ app.post("/login", async (req, res) => {
   }
 });
 
-// Profile
+// ✅ Profile
 app.get("/profile", verifyToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password");
@@ -124,7 +145,7 @@ app.get("/profile", verifyToken, async (req, res) => {
 
 /* ---------------------- POST ROUTES ---------------------- */
 
-// Get all posts of current user
+// ✅ Get all posts of current user
 app.get("/my-posts", verifyToken, async (req, res) => {
   try {
     const posts = await Post.find({ user: req.user.id }).sort({
@@ -136,7 +157,7 @@ app.get("/my-posts", verifyToken, async (req, res) => {
   }
 });
 
-// Get single post
+// ✅ Get single post
 app.get("/posts/:id", async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
@@ -147,7 +168,7 @@ app.get("/posts/:id", async (req, res) => {
   }
 });
 
-// Create post
+// ✅ Create post
 app.post("/posts", verifyToken, async (req, res) => {
   try {
     const { mood, content } = req.body;
@@ -176,7 +197,6 @@ app.post("/posts", verifyToken, async (req, res) => {
   }
 });
 
-/* ---------------------- ACHIEVEMENTS ROUTE ---------------------- */
 /* ---------------------- ACHIEVEMENTS ROUTE ---------------------- */
 app.patch("/achievements", verifyToken, async (req, res) => {
   try {
@@ -212,7 +232,7 @@ app.patch("/achievements", verifyToken, async (req, res) => {
   }
 });
 
-// Delete post
+// ✅ Delete post
 app.delete("/posts/:id", verifyToken, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
@@ -234,11 +254,11 @@ app.delete("/posts/:id", verifyToken, async (req, res) => {
 
 /* ---------------------- RIPPLE ROUTES ---------------------- */
 
-// Get all posts (with user info populated)
+// ✅ Get all posts (with user info populated)
 app.get("/ripple", async (req, res) => {
   try {
     const posts = await Post.find({})
-      .populate("user", "username email")
+      .populate("user", "username email") // include only username & email
       .sort({ createdAt: -1 }); // newest first
     res.json(posts);
   } catch (err) {
@@ -291,35 +311,3 @@ app.get("/mood-trends", verifyToken, async (req, res) => {
     res.status(500).json({ message: "Failed to fetch mood trends" });
   }
 });
-
-/* ---------------------- Database & Server Start ---------------------- */
-
-// Connect to DB and start server (but only start listening if not under test)
-const start = async () => {
-  try {
-    // ✅ Only connect if not already connected
-    if (mongoose.connection.readyState === 0) {
-      await mongoose.connect(process.env.ATLAS_URL);
-      console.log("✅ Database connected!");
-    } else {
-      console.log("ℹ️ Using existing mongoose connection");
-    }
-
-    // ✅ Only start listening outside of tests
-    if (process.env.NODE_ENV !== "test") {
-      app.listen(process.env.PORT || 3000, () => {
-        console.log(`Server running on port ${process.env.PORT || 3000}`);
-      });
-    } else {
-      console.log("Running in test mode — server.listen suppressed");
-    }
-  } catch (err) {
-    console.error("Database connection failed:", err.message);
-    if (process.env.NODE_ENV !== "test") process.exit(1);
-  }
-};
-
-start();
-
-// EXPORT the app so Supertest can use it
-module.exports = app;
